@@ -4,8 +4,27 @@
 XSLT stylesheet for transforming the XML from Restructured Text into
 HTML suitable for a web page.
 
-(c) Paul Wright  2001. You may modify and/or distribute the source for
-this stylesheet under the same licence terms as Python itself.
+$Id: 2html.xsl,v 1.2 2001/10/20 02:55:08 goodger Exp $
+
+(c) Paul Wright  2001.  All rights reserved.
+
+ Redistribution and use of this style sheet, with or without
+ modification, are permitted provided that such redistributions of this
+ style sheet retain the above copyright notice, this condition and the
+ following disclaimer.
+
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ HOLDERS OR THE CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
+ TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
+ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
+ DAMAGE.
 
 -->
 
@@ -31,11 +50,20 @@ this stylesheet under the same licence terms as Python itself.
   	<BODY>
 	<xsl:apply-templates/>
 	<!-- After the main document, add the footnotes -->
-	<HR/>
-	<H2>Footnotes</H2>
-	<xsl:for-each select="footnote">
-		<xsl:apply-templates select="." mode="footer"/>
-	</xsl:for-each>
+	<xsl:if test="count(footnote[@auto])">
+		<HR/>
+		<H2>Footnotes</H2>
+		<xsl:for-each select="footnote[@auto]">
+			<xsl:apply-templates select="." mode="footer"/>
+		</xsl:for-each>
+	</xsl:if>
+	<xsl:if test="count(footnote[not(@auto)])">
+		<HR/>
+		<H2>References</H2>
+		<xsl:for-each select="footnote[not(@auto)]">
+			<xsl:apply-templates select="." mode="footer"/>
+		</xsl:for-each>
+	</xsl:if>
 	</BODY>
   </xsl:template>
 
@@ -82,6 +110,11 @@ this stylesheet under the same licence terms as Python itself.
 	</H4>
   </xsl:template>
 
+	<xsl:template match="footnote/paragraph">
+		<xsl:apply-templates/>
+	</xsl:template>
+	
+
   <xsl:template match="paragraph">
   	<P>
 	<xsl:apply-templates/>
@@ -112,8 +145,7 @@ this stylesheet under the same licence terms as Python itself.
 	</PRE>
   </xsl:template>
 
-	<xsl:template name="htmLink">
-		<xsl:param name="dest" select="UNDEFINED"/>
+	<xsl:template name="linkout">
 		<xsl:element name="A">
 			<xsl:attribute name="HREF">
 				<xsl:value-of select="$dest"/>
@@ -125,7 +157,7 @@ this stylesheet under the same licence terms as Python itself.
 	<xsl:template match="link">
 		<!-- Straight link -->
 		<xsl:if test="@refuri">
-			<xsl:call-template name="htmLink">
+			<xsl:call-template name="linkout">
 				<xsl:with-param name="dest" select="@refuri"/>
 			</xsl:call-template>
 		</xsl:if>
@@ -135,13 +167,13 @@ this stylesheet under the same licence terms as Python itself.
 			<!-- Callout version of cross ref (most
 			suitable for use on the web, I think) -->
 			<xsl:if test="$tvalue">
-				<xsl:call-template name="htmLink">
+				<xsl:call-template name="linkout">
 					<xsl:with-param name="dest" select="$tvalue"/>
 				</xsl:call-template>
 			</xsl:if>
 			<!-- Internal cross reference -->
 			<xsl:if test="not($tvalue)">
-				<xsl:call-template name="htmLink">
+				<xsl:call-template name="linkout">
 					<xsl:with-param name="dest" select="concat('#',$tname)"/>
 				</xsl:call-template>
 			</xsl:if>
@@ -149,17 +181,42 @@ this stylesheet under the same licence terms as Python itself.
 	</xsl:template>
 
 	<xsl:template match="footnote_reference">
+		<!-- Handle the autonumbered footnotes -->
+		<xsl:if test="@auto">
+			<!-- named ones -->
+			<xsl:if test="@refname">
+				<xsl:param name="rname" select="@refname"/>
+				<xsl:param name="num"
+			   		select="count(//footnote[@name=$rname]/preceding::footnote [@auto='1'])
+					+1"/>
+			</xsl:if>
+			<!-- unnamed ones -->
+			<xsl:if test="not(@refname)">
+				<xsl:param name="num"
+				select="count(preceding::footnote_reference[@auto='1']) + 1"/>
+				<xsl:param name="rname" select="string($num)"/>
+			</xsl:if>
+			<xsl:param name="linktext" select="concat ('[', string($num), ']')"/>
+		</xsl:if>
+		<!-- Handle footnotes which give a refence name -->
+		<xsl:if test="not(@auto)">
+			<xsl:param name="rname" select="@refname"/>
+			<xsl:param name="linktext" select="concat ('[', text(), ']')"/>
+		</xsl:if>
 		<!-- Add an anchor so we can come back here. -->
 		<xsl:element name="A">
 			<xsl:attribute name="NAME">
 				<xsl:value-of select="concat('back_',
-				@refname)"/>
+				$rname)"/>
 			</xsl:attribute>
 		</xsl:element>
 		<!-- Link to footnote. -->
-		<xsl:call-template name="htmLink">
-			<xsl:with-param name="dest" select="concat('#',@refname)"/>
-		</xsl:call-template>
+		<xsl:element name="A">
+			<xsl:attribute name="HREF">
+				<xsl:value-of select="concat('#', $rname)"/>
+			</xsl:attribute>
+			<xsl:value-of select="$linktext"/>
+		</xsl:element>
 	</xsl:template>
 
 	<!-- If we're not at the bottom of the text, throw footnotes
@@ -169,27 +226,47 @@ this stylesheet under the same licence terms as Python itself.
 
 	<!-- Use footer mode to get the footnotes at the bottom -->
 	<xsl:template match="footnote" mode="footer">
-		<xsl:apply-templates/>
-	</xsl:template>
-
-	<xsl:template match="footnote/label">
-		<xsl:param name="refname"
-		select="parent::*/attribute::name"/>
+		<!-- Deal with auto numbered footnotes -->
+		<xsl:if test="@auto">
+			<xsl:param name="num" select="count(preceding::footnote[@auto='1']) + 1"/>
+			<!-- named ones -->
+			<xsl:if test="@name">
+				<xsl:param name="rname" select="@name"/>
+			</xsl:if>
+			<!-- unnamed ones -->
+			<xsl:if test="not(@name)">
+				<xsl:param name="rname" select="string($num)"/>
+			</xsl:if>
+			<xsl:param name="linktext" select="concat ('[', string($num), ']')"/>
+		</xsl:if>
+		<!-- Deal with footnotes with references specified by user -->
+		<xsl:if test="not(@auto)">
+			<xsl:param name="rname" select="@name"/>
+			<xsl:param name="linktext" select="concat ('[',
+			normalize-space(./label), ']')"/>
+		</xsl:if>
+		<!-- Name anchor to link to -->
+		<P>
 		<xsl:element name="A">
 			<xsl:attribute name="NAME">
-				<xsl:value-of select="$refname"/>
+				<xsl:value-of select="$rname"/>
 			</xsl:attribute>
 		</xsl:element>
-		<B>
+		<!-- Make footnote name a link back to the text -->
 		<xsl:element name="A">
 			<xsl:attribute name="HREF">
 				<xsl:value-of select="concat ('#back_',
-					$refname)"/>
+					$rname)"/>
 			</xsl:attribute>
-			<xsl:value-of select="normalize-space(text())"/>
-		</xsl:element>:</B>
+			<xsl:value-of select="$linktext"/>
+		</xsl:element>:<xsl:text>  </xsl:text>
+		<xsl:apply-templates/>
+		</P>
 	</xsl:template>
-	
+
+	<xsl:template match="footnote/label">
+		<!-- Label is extracted in footnote template so do nothing -->
+	</xsl:template>
 
 	<xsl:template match="section">
 		<xsl:element name="A">
@@ -267,9 +344,9 @@ this stylesheet under the same licence terms as Python itself.
 	</xsl:template>
 
 	<xsl:template match="literal">
-		<samp>
+		<SAMP>
 		<xsl:value-of select="text()"/>
-		</samp>
+		</SAMP>
 	</xsl:template>
 
 	<xsl:template match="table">
@@ -326,5 +403,3 @@ this stylesheet under the same licence terms as Python itself.
 	</xsl:template>			
 
 </xsl:stylesheet>
-
-
