@@ -652,7 +652,8 @@ class DumbHTMLFormatter:
         ''' (%text.model;)
             %refname.att;
         '''
-        raise NotImplementedError, node
+        #raise NotImplementedError, node
+	pass
 
     def format_problematic(self, node):
         ''' (%text.model;)
