@@ -469,7 +469,18 @@ class DumbHTMLFormatter:
             width     NMTOKEN   #IMPLIED
             scale     NMTOKEN   #IMPLIED
         '''
-        raise NotImplementedError, node
+	attrs = node.attributes
+	l = ['src="%(uri)s"'%attrs]
+	if attrs.has_key('alt'):
+	    l.append('alt="%(alt)s"'%attrs)
+	if attrs.has_key('alt'):
+	    l.append('alt="%(alt)s"'%attrs)
+	if attrs.has_key('height'):
+	    l.append('height="%(height)s"'%attrs)
+	if attrs.has_key('width'):
+	    l.append('width="%(width)s"'%attrs)
+	# TODO: scale
+        self.w('<img %s>'%(' '.join(l)))
 
     def format_caption(self, node):
         ''' %text.model;
@@ -590,7 +601,7 @@ class DumbHTMLFormatter:
         ''' (%text.model;)
             type      CDATA     #IMPLIED
         '''
-        raise NotImplementedError, node
+        pass #raise NotImplementedError, node
 
     def format_literal(self, node):
         ''' (#PCDATA)
@@ -608,12 +619,16 @@ class DumbHTMLFormatter:
         attrs = node.attributes
         doc = self.document
         ok = 1
+        print node
         if attrs.has_key('refuri'):
             self.w('<a href="%s">'%attrs['refuri'])
         elif doc.explicit_targets.has_key(attrs['refname']):
             # an external reference has been defined
             ref = doc.explicit_targets[attrs['refname']]
-            self.w('<a href="%s">'%ref.attributes['refuri'])
+            if ref.attributes.has_key('refuri'):
+                self.w('<a href="%s">'%ref.attributes['refuri'])
+            else:
+                self.w('<a href="#%s">'%attrs['refname'])
         elif doc.implicit_targets.has_key(attrs['refname']):
             # internal reference
             name = attrs['refname']
